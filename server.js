@@ -10,6 +10,8 @@ const app = express();
 
 // Rutas servicios
 const routeMastersRoutes = require("./routes/routeMasters");
+const routeUsers = require("./routes/userRoutes");
+const routeAuth = require("./routes/authRoutes");
 
 // Middlewares
 app.use(cors());
@@ -18,6 +20,8 @@ app.use(express.json());
 // Rutas
 app.use("/api/test", testRoutes);
 app.use("/api/routemasters", routeMastersRoutes);
+app.use("/api/users", routeUsers);
+app.use("/api/auth", routeAuth);
 
 // Configuración desde .env
 const PORT = process.env.PORT || 4000;
