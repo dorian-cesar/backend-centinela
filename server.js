@@ -8,12 +8,16 @@ const testRoutes = require("./routes/testRoutes");
 
 const app = express();
 
+// Rutas servicios
+const routeMastersRoutes = require("./routes/routeMasters");
+
 // Middlewares
 app.use(cors());
 app.use(express.json());
 
 // Rutas
 app.use("/api/test", testRoutes);
+app.use("/api/routemasters", routeMastersRoutes);
 
 // Configuración desde .env
 const PORT = process.env.PORT || 4000;
