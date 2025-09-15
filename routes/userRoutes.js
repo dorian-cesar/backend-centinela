@@ -9,7 +9,6 @@ router.get("/:id", ctrl.getUserById);
 router.post("/", ctrl.createUser);
 router.put("/:id", ctrl.updateUser);
 router.delete("/:id", ctrl.deleteUser);
-
-router.post("/:id/activar", ctrl.toggleActivo);
+router.patch("/:id/activar", ctrl.toggleActivo);
 
 module.exports = router;
