@@ -1,31 +1,33 @@
-const RouteMaster = require("../models/RouteMaster");
+const RouteMaster = require('../models/RouteMaster');
 
-// Crear nueva ruta maestra
+// Crear ruta maestra
 exports.createRouteMaster = async (req, res) => {
   try {
-    const newRoute = new RouteMaster(req.body);
-    await newRoute.save();
-    res.status(201).json(newRoute);
+    const route = new RouteMaster(req.body);
+    await route.save();
+    res.status(201).json(route);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
 
-// Obtener todas las rutas maestras
+// Listar todas las rutas maestras
 exports.getRouteMasters = async (req, res) => {
   try {
-    const routes = await RouteMaster.find();
+    const routes = await RouteMaster.find().populate('layout');
     res.json(routes);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
-// Obtener una ruta maestra por ID
+// Obtener ruta maestra por ID
 exports.getRouteMasterById = async (req, res) => {
   try {
-    const route = await RouteMaster.findById(req.params.id);
-    if (!route) return res.status(404).json({ error: "Ruta no encontrada" });
+    const route = await RouteMaster.findById(req.params.id).populate('layout');
+    if (!route) {
+      return res.status(404).json({ message: 'Ruta maestra no encontrada' });
+    }
     res.json(route);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -35,13 +37,12 @@ exports.getRouteMasterById = async (req, res) => {
 // Actualizar ruta maestra
 exports.updateRouteMaster = async (req, res) => {
   try {
-    const updatedRoute = await RouteMaster.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-    if (!updatedRoute) return res.status(404).json({ error: "Ruta no encontrada" });
-    res.json(updatedRoute);
+    const route = await RouteMaster.findByIdAndUpdate(req.params.id, req.body, { new: true })
+      .populate('layout');
+    if (!route) {
+      return res.status(404).json({ message: 'Ruta maestra no encontrada' });
+    }
+    res.json(route);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -50,9 +51,11 @@ exports.updateRouteMaster = async (req, res) => {
 // Eliminar ruta maestra
 exports.deleteRouteMaster = async (req, res) => {
   try {
-    const deleted = await RouteMaster.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ error: "Ruta no encontrada" });
-    res.json({ message: "Ruta eliminada con éxito" });
+    const route = await RouteMaster.findByIdAndDelete(req.params.id);
+    if (!route) {
+      return res.status(404).json({ message: 'Ruta maestra no encontrada' });
+    }
+    res.json({ message: 'Ruta maestra eliminada correctamente' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
