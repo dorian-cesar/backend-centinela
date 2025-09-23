@@ -174,16 +174,3 @@ exports.loginRut = async (req, res) => {
     }
 };
 
-
-
-// exports.resetPsw = async (req, res) => {
-
-//     try {
-//         //logica de reset
-//     } catch (err) {
-//         console.error("Error en reset:", err);
-//         res.status(500).json({
-//             message: "Error interno del servidor al resetear la contraseña."
-//         });
-//     }
-// }
