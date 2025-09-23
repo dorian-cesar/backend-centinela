@@ -12,7 +12,6 @@ const app = express();
 // Rutas servicios
 const routeAuth = require("./routes/authRoutes");
 const routeBusLayout = require("./routes/busLayoutRoutes");
-const routeReservation = require("./routes/reservationRoutes");
 const routeMastersRoutes = require("./routes/routeMasters");
 const routeSeat = require("./routes/seatRoutes");
 const routeService = require("./routes/serviceRoutes");
@@ -21,8 +20,8 @@ const routeUsers = require("./routes/userRoutes");
 // Middlewares
 app.use(cors());
 app.use(express.json());
-
-const auth = require("./middlewares/auth");
+const authRole = require("./middlewares/authRole");
+const dateRule = require("./middlewares/dateRule");
 
 
 //sin autenticacion
@@ -30,12 +29,11 @@ app.use("/api/auth", routeAuth);
 app.use("/api/test", testRoutes);
 
 // con autenticacion
-app.use("/api/bus-layout", auth, routeBusLayout);
-app.use('/api/reservations', auth, routeReservation);
-app.use("/api/route-masters", auth, routeMastersRoutes);
-app.use("/api/seats", auth, routeSeat);
-app.use("/api/services", auth, routeService);
-app.use("/api/users", auth, routeUsers);
+app.use("/api/bus-layout", authRole('superAdmin'), routeBusLayout);
+app.use("/api/route-masters", authRole('superAdmin'), routeMastersRoutes);
+app.use("/api/seats", authRole(), dateRule, routeSeat);
+app.use("/api/services", authRole(), dateRule, routeService);
+app.use("/api/users", authRole('superAdmin'), routeUsers);
 
 
 // Configuración desde .env

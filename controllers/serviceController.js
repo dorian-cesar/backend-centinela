@@ -43,8 +43,6 @@ exports.getServicesByFilter = async (req, res) => {
   try {
     const { date, origin, destination } = req.query;
 
-    console.log(req.query);
-
     if (!date || !origin || !destination) {
       return res.status(400).json({ message: 'Faltan parámetros obligatorios' });
     }
@@ -52,8 +50,6 @@ exports.getServicesByFilter = async (req, res) => {
     // Convertir date a rango de día completo
     const start = dayjs.tz(date, TZ).startOf('day').toDate(); // UTC equivalente a 00:00 Chile
     const end = dayjs.tz(date, TZ).endOf('day').toDate();
-
-    console.log({ startISO: start.toISOString(), endISO: end.toISOString() });
 
     const services = await Service.find({
       date: { $gte: start, $lte: end },
