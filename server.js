@@ -17,10 +17,12 @@ const routeAuth = require("./routes/authRoutes");
 app.use(cors());
 app.use(express.json());
 
+const auth = require("./middlewares/auth");
+
 // Rutas
 app.use("/api/test", testRoutes);
-app.use("/api/routemasters", routeMastersRoutes);
-app.use("/api/users", routeUsers);
+app.use("/api/routemasters", auth, routeMastersRoutes);
+app.use("/api/users", auth, routeUsers);
 app.use("/api/auth", routeAuth);
 
 // Configuración desde .env

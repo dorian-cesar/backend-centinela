@@ -51,12 +51,12 @@ exports.loginEmail = async (req, res) => {
             });
         }
 
-        const role = String(user.role || '').trim().toLowerCase();
-        if (role === "contratista" && !validDate()) {
-            return res.status(403).json({
-                message: "Acceso denegado: si eres contratista no puedes acceder antes del día 21 del mes."
-            })
-        }
+        // const role = String(user.role || '').trim().toLowerCase();
+        // if (role === "contratista" && !validDate()) {
+        //     return res.status(403).json({
+        //         message: "Acceso denegado: si eres contratista no puedes acceder antes del día 21 del mes."
+        //     })
+        // }
 
         // Generar token JWT
         const token = jwt.sign(
@@ -131,12 +131,12 @@ exports.loginRut = async (req, res) => {
             });
         }
 
-        const role = String(user.role || '').trim().toLowerCase();
-        if (role === "contratista" && !validDate()) {
-            return res.status(403).json({
-                message: "Acceso denegado: si eres contratista no puedes acceder antes del día 21 del mes."
-            })
-        }
+        // const role = String(user.role || '').trim().toLowerCase();
+        // if (role === "contratista" && !validDate()) {
+        //     return res.status(403).json({
+        //         message: "Acceso denegado: si eres contratista no puedes acceder antes del día 21 del mes."
+        //     })
+        // }
 
         // Generar token JWT
         const token = jwt.sign(
