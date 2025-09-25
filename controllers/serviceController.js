@@ -7,6 +7,7 @@ const { buildSeatMap } = require('../utils/buildSeatMap');
 const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
 const tz = require('dayjs/plugin/timezone');
+const Seat = require('../models/Seat');
 dayjs.extend(utc);
 dayjs.extend(tz);
 const TZ = 'America/Santiago';
@@ -14,14 +15,61 @@ const TZ = 'America/Santiago';
 
 exports.generateServices = async (req, res) => {
   try {
-    const { routeMasterId, startDate, daysOfWeek } = req.body;
+    const { routeMasterId } = req.body;
 
     const route = await RouteMaster.findById(routeMasterId).populate('layout');
     if (!route) return res.status(404).json({ error: 'Ruta maestra no encontrada' });
 
-    const services = await generateServicesForRoute(route, startDate, daysOfWeek);
+    // Verificar si el horario está activo
+    if (!route.schedule.active) {
+      return res.status(400).json({ error: 'El horario de esta ruta no está activo' });
+    }
 
-    res.status(201).json({ message: 'Servicios generados', count: services.length, services });
+    const services = await generateServicesForRoute(route);
+
+    res.status(201).json({
+      message: 'Servicios generados',
+      count: services.length,
+      services
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.generateServicesForAllActiveRoutes = async (req, res) => {
+  try {
+    const activeRoutes = await RouteMaster.find({
+      'schedule.active': true
+    }).populate('layout');
+
+    let totalServices = 0;
+    const results = [];
+
+    for (const route of activeRoutes) {
+      try {
+        const services = await generateServicesForRoute(route);
+        totalServices += services.length;
+        results.push({
+          route: route.name,
+          servicesCount: services.length,
+          status: 'success'
+        });
+      } catch (error) {
+        results.push({
+          route: route.name,
+          servicesCount: 0,
+          status: 'error',
+          error: error.message
+        });
+      }
+    }
+
+    res.status(201).json({
+      message: 'Generación de servicios completada',
+      totalServices,
+      results
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -29,7 +77,7 @@ exports.generateServices = async (req, res) => {
 
 exports.getServices = async (req, res) => {
   try {
-    const services = await Service.find().populate('routeMaster layout seats');
+    const services = await Service.find().populate('routeMaster layout');
     res.json(services);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -37,7 +85,7 @@ exports.getServices = async (req, res) => {
 };
 
 
-// GET /api/services/filter?date=YYYY-MM-DD&direction=subida&origin=XXX&destination=YYY
+// GET /api/services/filter?date=YYYY-MM-DD&origin=XXX&destination=YYY
 
 exports.getServicesByFilter = async (req, res) => {
   try {
@@ -47,22 +95,48 @@ exports.getServicesByFilter = async (req, res) => {
       return res.status(400).json({ message: 'Faltan parámetros obligatorios' });
     }
 
-    // Convertir date a rango de día completo
-    const start = dayjs.tz(date, TZ).startOf('day').toDate(); // UTC equivalente a 00:00 Chile
+    const start = dayjs.tz(date, TZ).startOf('day').toDate();
     const end = dayjs.tz(date, TZ).endOf('day').toDate();
 
-    const services = await Service.find({
+    // Traer servicios que tengan ambas paradas
+    const servicesRaw = await Service.find({
       date: { $gte: start, $lte: end },
-      origin,
-      "departures.stop": destination // <-- así buscas por parada intermedia
-    }).populate('seats layout routeMaster');
+      departures: {
+        $all: [
+          { $elemMatch: { stop: origin } },
+          { $elemMatch: { stop: destination } }
+        ]
+      }
+    })
+      .select('-__v')
+      .lean();
 
-    res.json(services);
+    // Filtrar por orden de paradas
+    const servicesFiltered = servicesRaw.filter(service => {
+      const depOrigin = service.departures.find(d => d.stop === origin);
+      const depDest = service.departures.find(d => d.stop === destination);
+      return depOrigin.order < depDest.order;
+    });
+
+    // Mapear y agregar conteo de asientos
+    const servicesWithSeats = await Promise.all(
+      servicesFiltered.map(async service => {
+        const seatCount = await Seat.countDocuments({ service: service._id });
+
+        return {
+          ...service,
+          seats: seatCount
+        };
+      })
+    );
+
+    res.json(servicesWithSeats);
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error al buscar servicios' });
   }
-}
+};
 
 
 exports.getServicesByID = async (req, res) => {
@@ -101,14 +175,14 @@ exports.getServicesByID = async (req, res) => {
 
     const serviceObj = service.toObject();
     serviceObj.departures = departuresForClient;
-    
+
     // reemplazamos layout.seatMap con los asientos reales
     serviceObj.layout = buildSeatMap(serviceObj);
-    
+
     delete serviceObj.seats;
-    
+
     return res.status(200).json({ service: serviceObj });
-    
+
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: error.message || 'Error interno' });

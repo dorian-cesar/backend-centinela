@@ -6,6 +6,7 @@ const cors = require("cors");
 
 const testRoutes = require("./routes/testRoutes");
 const startReleaseSeatsCron = require("./cron/releaseSeats");
+const startGenerateServicesCron = require("./cron/generateServices");
 
 const app = express();
 
@@ -45,6 +46,7 @@ mongoose.connect(MONGO_URI)
   .then(() => {
     console.log("✅ Conectado a MongoDB");
     startReleaseSeatsCron();
+    startGenerateServicesCron();
     app.listen(PORT, () => console.log(`🚀 Servidor en http://localhost:${PORT}`));
   })
   .catch(err => console.error("❌ Error en conexión MongoDB:", err));

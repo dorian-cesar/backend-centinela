@@ -12,14 +12,14 @@ function startReleaseSeatsCron() {
             );
 
             if (expiredSeats.modifiedCount > 0) {
-                console.log(`Se liberaron ${expiredSeats.modifiedCount} asientos expirados`);
+                console.log(`[CRON-SEATS] Se liberaron ${expiredSeats.modifiedCount} asientos expirados`);
             }
         } catch (err) {
-            console.error('Error liberando asientos:', err);
+            console.error('[CRON-SEATS] Error liberando asientos:', err);
         }
     });
 
-    console.log('Cron iniciado');
+    console.log('[CRON-SEATS] Cron iniciado');
 }
 
 module.exports = startReleaseSeatsCron;
