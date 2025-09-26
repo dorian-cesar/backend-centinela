@@ -9,10 +9,15 @@ router.post('/generate-all', role('superAdmin'), serviceController.generateServi
 
 // Listar servicios
 router.get('/', serviceController.getServices);
-
-// NUEVO endpoint para filtrar servicios
 router.get('/filter', serviceController.getServicesByFilter);
 router.get('/:id', serviceController.getServicesByID);
+
+// tripulacion
+router.put('/:id/assign', serviceController.assignBusAndCrew);
+
+// far
+router.put('/:id/far', serviceController.assignFar);
+router.put('/:id/far/expenses', serviceController.addFarExpenses);
 
 
 module.exports = router;

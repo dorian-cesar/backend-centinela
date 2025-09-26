@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const Service = require('../models/Service');
 const RouteMaster = require('../models/RouteMaster');
+const Bus = require('../models/Bus');
+const User = require('../models/User');
 const { generateServicesForRoute } = require('../utils/serviceGenerator');
 const { buildSeatMap } = require('../utils/buildSeatMap');
 
@@ -12,6 +14,7 @@ dayjs.extend(utc);
 dayjs.extend(tz);
 const TZ = 'America/Santiago';
 
+const VALID_ROLES = ['conductor', 'auxiliar'];
 
 exports.generateServices = async (req, res) => {
   try {
@@ -77,15 +80,12 @@ exports.generateServicesForAllActiveRoutes = async (req, res) => {
 
 exports.getServices = async (req, res) => {
   try {
-    const services = await Service.find().populate('routeMaster layout');
+    const services = await Service.find().populate({ path: 'routeMaster', select: '-layout -createdAt -updatedAt -__v' }).populate({ path: 'layout', select: '-floor1 -floor2 -createdAt -updatedAt -__v' });
     res.json(services);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
-
-
-// GET /api/services/filter?date=YYYY-MM-DD&origin=XXX&destination=YYY
 
 exports.getServicesByFilter = async (req, res) => {
   try {
@@ -108,8 +108,23 @@ exports.getServicesByFilter = async (req, res) => {
         ]
       }
     })
-      .select('-__v')
-      .lean();
+      .select('-__v -createdAt -updatedAt')
+      .populate({
+        path: 'layout',
+        select: '-__v -createdAt -updatedAt -floor1 -floor2'
+      })
+      .populate({
+        path: 'bus',
+        select: '-__v -createdAt -updatedAt'
+      })
+      .populate({
+        path: 'crew.user',
+        select: '-password -__v -createdAt -updatedAt'
+      })
+    // .populate({
+    //   path: 'seats',
+    //   select: '-__v -createdAt -updatedAt'
+    // });
 
     // Filtrar por orden de paradas
     const servicesFiltered = servicesRaw.filter(service => {
@@ -118,19 +133,7 @@ exports.getServicesByFilter = async (req, res) => {
       return depOrigin.order < depDest.order;
     });
 
-    // Mapear y agregar conteo de asientos
-    const servicesWithSeats = await Promise.all(
-      servicesFiltered.map(async service => {
-        const seatCount = await Seat.countDocuments({ service: service._id });
-
-        return {
-          ...service,
-          seats: seatCount
-        };
-      })
-    );
-
-    res.json(servicesWithSeats);
+    return res.status(200).json({ services: servicesFiltered });
 
   } catch (err) {
     console.error(err);
@@ -147,8 +150,23 @@ exports.getServicesByID = async (req, res) => {
 
     const service = await Service.findById(id)
       // .populate('routeMaster', '-stops -layout -createdAt -updatedAt -__v')
-      .populate('layout')
-      .populate('seats');
+      .populate({
+        path: 'layout',
+        select: '-__v -createdAt -updatedAt'
+      })
+      .populate({
+        path: 'seats',
+        select: '-__v -createdAt -updatedAt'
+      })
+      .populate({
+        path: 'bus',
+        select: '-__v -createdAt -updatedAt'
+      })
+      .populate({
+        path: 'crew.user',
+        select: '-password -__v -createdAt -updatedAt'
+      })
+      .select('-__v -createdAt -updatedAt');
 
     if (!service) return res.status(404).json({ message: 'servicio no encontrado' });
 
@@ -186,5 +204,166 @@ exports.getServicesByID = async (req, res) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: error.message || 'Error interno' });
+  }
+};
+
+
+exports.assignBusAndCrew = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { bus, crew } = req.body;
+
+    // Validar id del service
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'ID de servicio inválido' });
+    }
+
+    if (!bus && !crew) {
+      return res.status(400).json({ message: 'Debes enviar al menos "bus" o "crew" en el body' });
+    }
+
+    const update = {};
+
+    // Si viene bus: validar formato y existencia
+    if (bus) {
+      if (!mongoose.Types.ObjectId.isValid(bus)) {
+        return res.status(400).json({ message: 'ID de bus inválido' });
+      }
+      const busExists = await Bus.exists({ _id: bus });
+      if (!busExists) return res.status(404).json({ message: 'Bus no encontrado' });
+      update.bus = bus;
+    }
+
+    // Si viene crew: validar estructura y existencia de usuarios + roles válidos
+    if (crew) {
+      if (!Array.isArray(crew)) {
+        return res.status(400).json({ message: 'Crew debe ser un array' });
+      }
+
+      // Validar cada miembro
+      const userIds = [];
+      for (const [i, member] of crew.entries()) {
+        if (!member || !member.user || !member.role) {
+          return res.status(400).json({ message: `Crew[${i}] debe tener 'user' y 'role'` });
+        }
+        if (!mongoose.Types.ObjectId.isValid(member.user)) {
+          return res.status(400).json({ message: `Crew[${i}].user tiene ID inválido` });
+        }
+        if (!VALID_ROLES.includes(member.role)) {
+          return res.status(400).json({ message: `Crew[${i}].role inválido (permitidos: ${VALID_ROLES.join(', ')})` });
+        }
+        userIds.push(member.user);
+      }
+
+      // Comprobar que todos los usuarios existen
+      const usersCount = await User.countDocuments({ _id: { $in: userIds } });
+      if (usersCount !== userIds.length) {
+        return res.status(404).json({ message: 'Alguno de los usuarios del crew no existe' });
+      }
+
+      update.crew = crew;
+    }
+
+    // Actualizar y devolver documento poblado
+    const updated = await Service.findByIdAndUpdate(
+      id,
+      { $set: update },
+      { new: true, runValidators: true }
+    )
+      .populate('layout')
+      .populate({
+        path: 'bus',
+        select: '-__v -createdAt -updatedAt'
+      })
+      .populate({
+        path: 'crew.user',
+        select: '-password -__v -createdAt -updatedAt'
+      });
+
+    if (!updated) return res.status(404).json({ message: 'Servicio no encontrado' });
+
+    return res.status(200).json({ message: 'Asignación realizada', service: updated });
+  } catch (err) {
+    console.error('assignBusAndCrew error:', err);
+    return res.status(500).json({ message: 'Error interno', error: err.message });
+  }
+};
+
+
+//asignar far
+exports.assignFar = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { folio, amount, deliveredTo } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ message: 'ID de servicio inválido' });
+    if (!folio || typeof folio !== 'string') return res.status(400).json({ message: 'folio requerido' });
+    if (amount == null || isNaN(Number(amount)) || Number(amount) < 0) return res.status(400).json({ message: 'amount inválido' });
+    if (!deliveredTo || !mongoose.Types.ObjectId.isValid(deliveredTo)) return res.status(400).json({ message: 'deliveredTo inválido' });
+
+    // comprobar que user existe
+    const userExists = await User.exists({ _id: deliveredTo });
+    if (!userExists) return res.status(404).json({ message: 'Usuario entregado no existe' });
+
+    // actualizar usando $set (y crear far si no existe)
+    const update = {
+      'far.folio': folio,
+      'far.amount': Number(amount),
+      'far.deliveredTo': deliveredTo,
+      'far.deliveredAt': new Date(),
+      'far.status': 'pendiente',
+      'far.renderedAt': null,
+      'far.expenses': []
+    };
+
+    // Intentar actualizar; podría fallar por folio duplicado
+    const updated = await Service.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true })
+      .populate('crew.user', '-password -__v -createdAt -updatedAt')
+      .populate('far.deliveredTo', '-password -__v -createdAt -updatedAt')
+      .select('-__v -createdAt -updatedAt');
+
+    if (!updated) return res.status(404).json({ message: 'Servicio no encontrado' });
+
+    return res.status(200).json({ message: 'FAR asignado', service: updated });
+  } catch (err) {
+    // detectar error duplicate key
+    if (err && err.code === 11000) {
+      return res.status(409).json({ message: 'Folio FAR ya existe' });
+    }
+    console.error(err);
+    return res.status(500).json({ message: 'Error interno', error: err.message });
+  }
+};
+
+exports.addFarExpenses = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { expenses } = req.body; // array de {description, amount}
+
+    if (!Array.isArray(expenses) || expenses.length === 0) {
+      return res.status(400).json({ message: 'Debe enviar un array de expenses' });
+    }
+
+    const service = await Service.findById(id);
+    if (!service || !service.far) {
+      return res.status(404).json({ message: 'Servicio o FAR no encontrado' });
+    }
+
+    const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    if (totalExpenses > service.far.amount) {
+      return res.status(400).json({ message: 'Los gastos exceden el monto del FAR' });
+    }
+
+    // actualizar FAR
+    service.far.expenses = expenses;
+    service.far.renderedAt = new Date();
+    service.far.status = 'rendido';
+
+    await service.save();
+
+    return res.status(200).json({ message: 'Gastos registrados', far: service.far });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Error interno', error: err.message });
   }
 };

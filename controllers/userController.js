@@ -9,7 +9,7 @@ const sanitize = (doc) => {
     return obj;
 };
 
-const ALLOWED_ROLES = new Set(["superAdmin", "centinela", "contratista"]);
+const ALLOWED_ROLES = new Set(["superAdmin", "centinela", "contratista", "conductor", "auxiliar"]);
 const isValidEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s).trim());
 const isBcryptHash = (s = "") => typeof s === "string" && /^\$2[aby]\$/.test(s);
 
@@ -93,6 +93,23 @@ exports.getUserById = async (req, res) => {
         return res.status(500).json({ message: "Error al obtener usuario.", error: err.message });
     }
 };
+
+exports.getCrewUsers = async (req, res) => {
+    try {
+      const crewUsers = await User.find({
+        role: { $in: ["conductor", "auxiliar"] },
+        activo: true, // opcional: solo los activos
+      }).select("-password -createdAt -updatedAt -__v"); // excluye el password
+  
+      res.json({
+        count: crewUsers.length,
+        users: crewUsers,
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  };
+  
 
 // --- Actualizar (PUT) ---
 // NOTA: Usamos "findById" + "save()" para que se dispare el pre('save') (hash de password)

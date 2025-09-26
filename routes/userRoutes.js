@@ -14,6 +14,7 @@ const createAccountLimiter = rateLimit({
 
 // CRUD
 router.get("/", ctrl.getUsers);
+router.get("/crew", ctrl.getCrewUsers);
 router.get("/:id", ctrl.getUserById);
 router.post("/", createAccountLimiter, ctrl.createUser);
 router.put("/:id", ctrl.updateUser);

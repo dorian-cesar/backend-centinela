@@ -31,4 +31,13 @@ const routeMasterSchema = new mongoose.Schema({
   lastGeneratedDate: { type: Date, default: null }
 }, { timestamps: true });
 
+routeMasterSchema.pre('remove', async function(next) {
+  try {
+    await Service.deleteMany({ routeMaster: this._id });
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = mongoose.model('RouteMaster', routeMasterSchema);

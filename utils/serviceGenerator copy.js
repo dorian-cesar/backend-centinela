@@ -154,7 +154,7 @@ async function createServiceInstance(route, currentLocalDate, direction) {
       const minute = route.startTime % 60;
       baseDeparture = currentLocalDate.hour(hour).minute(minute).second(0).millisecond(0);
     } else {
-      throw new Error('RouteMaster necesita startTime (minutos)');
+      throw new Error('RouteMaster necesita startTime (minutos) o baseDepartureTime ("HH:mm")');
     }
 
     let existingService = await Service.findOne({

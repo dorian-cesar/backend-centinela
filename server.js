@@ -17,6 +17,7 @@ const routeMastersRoutes = require("./routes/routeMasters");
 const routeSeat = require("./routes/seatRoutes");
 const routeService = require("./routes/serviceRoutes");
 const routeUsers = require("./routes/userRoutes");
+const routeBus = require("./routes/busRoutes");
 
 // Middlewares
 app.use(cors());
@@ -34,6 +35,7 @@ app.use("/api/bus-layout", authRole('superAdmin'), routeBusLayout);
 app.use("/api/route-masters", authRole('superAdmin'), routeMastersRoutes);
 app.use("/api/seats", authRole(), dateRule, routeSeat);
 app.use("/api/services", authRole(), dateRule, routeService);
+app.use("/api/buses", authRole(), dateRule, routeBus);
 app.use("/api/users", authRole('superAdmin'), routeUsers);
 
 
@@ -46,7 +48,7 @@ mongoose.connect(MONGO_URI)
   .then(() => {
     console.log("✅ Conectado a MongoDB");
     startReleaseSeatsCron();
-    startGenerateServicesCron();
+    // startGenerateServicesCron();
     app.listen(PORT, () => console.log(`🚀 Servidor en http://localhost:${PORT}`));
   })
   .catch(err => console.error("❌ Error en conexión MongoDB:", err));
